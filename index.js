@@ -1,13 +1,10 @@
 const cors = require('cors');
-const disk = require('diskusage');
+const { execSync } = require('child_process');
 const express = require('express');
 const os = require('os');
 
 const app = express();
 const port = 3005;
-
-//Assume that the application is running on a C drive on Windows or / path on Linux
-const targetPath = os.platform() === 'win32' ? 'C:' : '/';
 
 function CPU_Usage(res, mode, id)
 {
@@ -74,6 +71,43 @@ function Calculate_CPU_Usage_Core(cpu)
     };
 }
 
+function Get_Disk_Usage()
+{
+    try
+    {
+        if( os.platform() === 'win32') //Not sure if it works, not tested
+        {
+            //Assume the app is running on a C: drive
+            const output = execSync('wmic logicaldisk where "DeviceID=\'C:\'" get FreeSpace,Size /format:list', { encoding: 'utf8' });
+            const matches = output.match(/FreeSpace=(\d+)\r?\nSize=(\d+)/);
+            if (matches)
+            {
+                return {
+                    free: parseInt(matches[1], 10),
+                    total: parseInt(matches[2], 10),
+                }
+            }
+        }
+        else
+        {
+            //Assume that / is mounted on main drive
+            const output = execSync('df -k /', { encoding: 'utf8' });
+            const lines = output.split('\n');
+            const values = lines[1].split(/\s+/)
+            return {
+                //Using available so it returns amount of space available to regular user, e.g. without reserved space
+                total: parseInt(values[1], 10) * 1024,
+                available: parseInt(values[3], 10) * 1024,
+            };
+        }
+    }
+    catch (error)
+    {
+        console.log('Error getting disk usage:', error);
+        return null;
+    }
+}
+
 app.use(cors());
 
 //Architecture
@@ -111,7 +145,7 @@ app.get('/disk-free', async (req, res) => {
     //Bytes
     try
     {
-        const {available} = disk.checkSync(targetPath);
+        const {available} = Get_Disk_Usage();
         res.json(available);
     }
     catch(error) { res.status(500).json({error: error.message}); }
@@ -121,7 +155,7 @@ app.get('/disk-total', async (req, res) => {
     //Bytes
     try
     {
-        const {total} = disk.checkSync(targetPath);
+        const {total} = Get_Disk_Usage();
         res.json(total);
     }
     catch(error) { res.status(500).json({error: error.message}); }
@@ -131,8 +165,8 @@ app.get('/disk-usage', async (req, res) => {
     //Bytes
     try
     {
-        const {free, total} = disk.checkSync(targetPath);
-        res.json(total - free);
+        const {available, total} = Get_Disk_Usage();
+        res.json(total - available);
     }
     catch(error) { res.status(500).json({error: error.message}); }
 })
@@ -141,8 +175,8 @@ app.get('/disk-usage-percentage', async (req, res) => {
     //Bytes
     try
     {
-        const {free, total} = disk.checkSync(targetPath);
-        res.json((total - free) / total * 100);
+        const {available, total} = Get_Disk_Usage();
+        res.json((total - available) / total * 100);
     }
     catch(error) { res.status(500).json({error: error.message}); }
 })

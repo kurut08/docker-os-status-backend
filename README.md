@@ -5,21 +5,14 @@ info about the machine that it's running on.
 ## About
 
 ### Imports
-Imported packages are: cors, diskusage, express and os.
+Imported packages are: cors and express. os module is also used.
 
 ### Port
 By default, the application is using port 3005. It can be changed at
-line 7 of index.js.
+line 7 of index.js and line 12 of Dockerfile.
 
 ### Base image
 Image used as a base is node:23.9-alpine3.20.
-
-### Why does the image of this simple program take up to 480MB?
-
-That's because most of it is used by one of the dependencies (diskusage),
-its own dependencies and software required to make it run
-(python3, make, g++).
-It causes the image size to go from 163MB to up to 480MB.
 
 ### What endpoints are available in this application?
 - /architecture -  returns machine type (arm64, x86_64 etc.),
